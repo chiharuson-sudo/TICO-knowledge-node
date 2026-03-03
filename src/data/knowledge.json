@@ -1,0 +1,122 @@
+[
+  {
+    "id": "K01",
+    "title": "電圧レンジ確認は仕様書と図面の両方で行う",
+    "viewpoint": "⑤絶対注意（ミス防止）",
+    "content": "電圧レンジの確認は仕様書だけでなく図面の表記も照合すること。",
+    "product": "充電器",
+    "timeline": "プレAS",
+    "client": "共通",
+    "flow": "詳細設計・図面化",
+    "domain": "電力変換",
+    "source": "会議A"
+  },
+  {
+    "id": "K02",
+    "title": "異常検知時のフェイルセーフ動作を必ず定義する",
+    "viewpoint": "④設計思想・教訓",
+    "content": "異常検知後は安全側に倒すフェイルセーフを設計で明文化する。",
+    "product": "共通",
+    "timeline": "共通",
+    "client": "共通",
+    "flow": "詳細設計・図面化",
+    "domain": "組み込みソフト",
+    "source": "会議B"
+  },
+  {
+    "id": "K03",
+    "title": "試作前の部品表・BOM突合を必須化",
+    "viewpoint": "②社内ルール・段取り",
+    "content": "試作前にBOMと図面の部品表を突合し差異をゼロにする。",
+    "product": "コンバータ",
+    "timeline": "前後",
+    "client": "共通",
+    "flow": "初回試作・評価",
+    "domain": "電力変換",
+    "source": "会議A"
+  },
+  {
+    "id": "K04",
+    "title": "温度サイクル試験の保持時間は規格準拠で実施",
+    "viewpoint": "③技術的注意点",
+    "content": "温度サイクルは規格の保持時間を守り、短縮しない。",
+    "product": "共通",
+    "timeline": "FS",
+    "client": "共通",
+    "flow": "初回試作・評価",
+    "domain": "電力変換",
+    "source": "会議B"
+  },
+  {
+    "id": "K05",
+    "title": "CAN ID・マスクは顧客別一覧で管理",
+    "viewpoint": "①判断ルール・分岐条件",
+    "content": "CAN IDとマスクは顧客別一覧表で一元管理し競合を防ぐ。",
+    "product": "充電器",
+    "timeline": "共通",
+    "client": "共通",
+    "flow": "詳細設計・図面化",
+    "domain": "組み込みソフト",
+    "source": "会議A"
+  },
+  {
+    "id": "K06",
+    "title": "不具合再発防止は原因と対策の両方を記録",
+    "viewpoint": "⑧再発防止・未然防止",
+    "content": "再発防止では真因と対策の対応関係を記録に残す。",
+    "product": "共通",
+    "timeline": "共通",
+    "client": "共通",
+    "flow": "量産・トラブル対応",
+    "domain": "共通",
+    "source": "会議B"
+  },
+  {
+    "id": "K07",
+    "title": "電源系変更は他機能への波及をチェックリストで確認",
+    "viewpoint": "⑨影響範囲・波及リスク",
+    "content": "電源回路変更時は他機能への波及チェックリストで確認する。",
+    "product": "コンバータ",
+    "timeline": "前後",
+    "client": "共通",
+    "flow": "詳細設計・図面化",
+    "domain": "電力変換",
+    "source": "会議A"
+  },
+  {
+    "id": "K08",
+    "title": "DR前には設計意図シートを必ず作成",
+    "viewpoint": "②社内ルール・段取り",
+    "content": "デザインレビュー前に設計意図シートを用意し共有する。",
+    "product": "共通",
+    "timeline": "共通",
+    "client": "共通",
+    "flow": "詳細設計・図面化",
+    "domain": "共通",
+    "source": "会議B"
+  },
+  {
+    "id": "K09",
+    "title": "安全関連パラメータは変更履歴を残す",
+    "viewpoint": "⑤絶対注意（ミス防止）",
+    "content": "安全関連のパラメータ変更は必ず履歴管理する。",
+    "product": "充電器",
+    "timeline": "FS",
+    "client": "共通",
+    "flow": "詳細設計・図面化",
+    "domain": "組み込みソフト",
+    "source": "会議A"
+  },
+  {
+    "id": "K10",
+    "title": "EMC対策は筐体と基板の両方で検討",
+    "viewpoint": "③技術的注意点",
+    "content": "EMCは筐体設計と基板レイアウトの両面から検討する。",
+    "product": "共通",
+    "timeline": "前後",
+    "client": "共通",
+    "flow": "初回試作・評価",
+    "domain": "電力変換",
+    "source": "会議B"
+  }
+]

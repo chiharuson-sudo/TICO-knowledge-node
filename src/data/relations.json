@@ -1,0 +1,14 @@
+[
+  { "from": "K01", "to": "K02", "type": "前提", "description": "電圧確認の前提として安全設計がある" },
+  { "from": "K02", "to": "K06", "type": "因果", "description": "フェイルセーフ不備が不具合の原因になり得る" },
+  { "from": "K03", "to": "K04", "type": "前提", "description": "試作突合後に評価試験を行う" },
+  { "from": "K05", "to": "K02", "type": "対策", "description": "CAN管理で異常検知の一貫性を担保" },
+  { "from": "K07", "to": "K06", "type": "波及", "description": "電源変更の波及が不具合再発につながる" },
+  { "from": "K08", "to": "K01", "type": "前提", "description": "DR前に図面・仕様の整合を取る" },
+  { "from": "K08", "to": "K03", "type": "前提", "description": "DRでBOM突合の結果を確認" },
+  { "from": "K09", "to": "K02", "type": "対策", "description": "パラメータ履歴で安全設計を追跡" },
+  { "from": "K04", "to": "K10", "type": "因果", "description": "温度試験とEMCは環境試験で関連" },
+  { "from": "K02", "to": "K09", "type": "前提", "description": "フェイルセーフにパラメータ管理が必要" },
+  { "from": "K06", "to": "K08", "type": "対策", "description": "再発防止のためDRで設計意図を共有" },
+  { "from": "K01", "to": "K05", "type": "因果", "description": "電圧・通信仕様は表で管理すると漏れ防止" }
+]
