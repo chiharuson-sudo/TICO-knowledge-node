@@ -67,18 +67,40 @@ function KnowledgeGraphInner({
     [rawNodes]
   );
 
-  const initialEdges: Edge[] = useMemo(
-    () =>
-      rawEdges.map((e: FilteredEdge) => ({
-        id: e.id ?? `${e.from}-${e.to}-${e.type}`,
+  const initialEdges: Edge[] = useMemo(() => {
+    const key = (e: FilteredEdge) => `${e.from}-${e.to}`;
+    const byKey = new Map<string, FilteredEdge[]>();
+    rawEdges.forEach((e) => {
+      const k = key(e);
+      if (!byKey.has(k)) byKey.set(k, []);
+      byKey.get(k)!.push(e);
+    });
+    const curvatureByEdge = new Map<string, number>();
+    const useSmoothByEdge = new Map<string, boolean>();
+    byKey.forEach((edges) => {
+      const single = edges.length === 1;
+      edges.forEach((e, i) => {
+        const id = e.id ?? `${e.from}-${e.to}-${e.type}`;
+        curvatureByEdge.set(id, single ? 0.25 : 0.18 + 0.14 * i);
+        useSmoothByEdge.set(id, single);
+      });
+    });
+    return rawEdges.map((e: FilteredEdge) => {
+      const id = e.id ?? `${e.from}-${e.to}-${e.type}`;
+      return {
+        id,
         source: e.from,
         target: e.to,
         type: "knowledge",
-        data: { type: e.type },
+        data: {
+          type: e.type,
+          curvature: curvatureByEdge.get(id) ?? 0.25,
+          useSmoothStep: useSmoothByEdge.get(id) ?? true,
+        },
         markerEnd: { type: MarkerType.ArrowClosed },
-      })),
-    [rawEdges]
-  );
+      };
+    });
+  }, [rawEdges]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -101,6 +123,23 @@ function KnowledgeGraphInner({
       };
     });
     setNodes(newNodes);
+    const key = (e: FilteredEdge) => `${e.from}-${e.to}`;
+    const byKey = new Map<string, FilteredEdge[]>();
+    rawEdges.forEach((e) => {
+      const k = key(e);
+      if (!byKey.has(k)) byKey.set(k, []);
+      byKey.get(k)!.push(e);
+    });
+    const curvatureByEdge = new Map<string, number>();
+    const useSmoothByEdge = new Map<string, boolean>();
+    byKey.forEach((edges) => {
+      const single = edges.length === 1;
+      edges.forEach((e, i) => {
+        const id = e.id ?? `${e.from}-${e.to}-${e.type}`;
+        curvatureByEdge.set(id, single ? 0.25 : 0.18 + 0.14 * i);
+        useSmoothByEdge.set(id, single);
+      });
+    });
     setEdges(
       rawEdges.map((e: FilteredEdge) => {
         const id = e.id ?? `${e.from}-${e.to}-${e.type}`;
@@ -112,7 +151,11 @@ function KnowledgeGraphInner({
           source: e.from,
           target: e.to,
           type: "knowledge",
-          data: { type: e.type },
+          data: {
+            type: e.type,
+            curvature: curvatureByEdge.get(id) ?? 0.25,
+            useSmoothStep: useSmoothByEdge.get(id) ?? true,
+          },
           markerEnd: { type: MarkerType.ArrowClosed },
           selected: connected,
         };
