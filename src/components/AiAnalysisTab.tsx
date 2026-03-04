@@ -6,10 +6,16 @@ import type { Knowledge, Relation } from "@/lib/types";
 import type { ClassificationResult } from "@/lib/relation-classifier";
 
 const DEFAULT_SETTINGS = {
-  similarityThreshold: 0.72,
-  confidenceThreshold: 0.6,
+  similarityThreshold: 0.65,
+  confidenceThreshold: 0.5,
   maxCandidates: 20,
 };
+
+export interface AnalysisStats {
+  pairsAboveThreshold: number;
+  pairsSentToLLM: number;
+  relationsFound: number;
+}
 
 interface AiAnalysisTabProps {
   knowledge: Knowledge[];
@@ -45,6 +51,7 @@ export function AiAnalysisTab({
   );
   const [maxCandidates, setMaxCandidates] = useState(DEFAULT_SETTINGS.maxCandidates);
   const [error, setError] = useState<string | null>(null);
+  const [analysisStats, setAnalysisStats] = useState<AnalysisStats | null>(null);
 
   const handleAnalyze = useCallback(async () => {
     if (knowledge.length === 0) {
@@ -104,7 +111,8 @@ export function AiAnalysisTab({
         throw new Error(err.error ?? `会議横断API ${pairRes.status}`);
       }
       const { pairs } = await pairRes.json();
-      const topPairs = (pairs ?? []).slice(0, maxCandidates);
+      const allPairs = pairs ?? [];
+      const topPairs = allPairs.slice(0, maxCandidates);
 
       const nodeMap = new Map(knowledge.map((n) => [n.id, n]));
       const classified: EdgeCandidate[] = [];
@@ -139,10 +147,16 @@ export function AiAnalysisTab({
           });
         }
       }
+      setAnalysisStats({
+        pairsAboveThreshold: allPairs.length,
+        pairsSentToLLM: topPairs.length,
+        relationsFound: classified.length,
+      });
       setCandidates(classified);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setCandidates([]);
+      setAnalysisStats(null);
     } finally {
       setAnalyzing(false);
     }
@@ -323,6 +337,9 @@ export function AiAnalysisTab({
         onApprove={onApprove}
         onReject={onReject}
         isLoading={isAnalyzing}
+        analysisStats={analysisStats}
+        similarityThreshold={similarityThreshold}
+        confidenceThreshold={confidenceThreshold}
       />
     </div>
   );

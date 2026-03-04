@@ -1,7 +1,9 @@
 "use client";
 
+import type React from "react";
 import type { Knowledge } from "@/lib/types";
 import type { ClassificationResult } from "@/lib/relation-classifier";
+import type { AnalysisStats } from "./AiAnalysisTab";
 
 export interface EdgeCandidate {
   fromId: string;
@@ -19,6 +21,9 @@ interface EdgeReviewPanelProps {
   onReject: (fromId: string, toId: string) => void;
   onEdit?: (fromId: string, toId: string) => void;
   isLoading: boolean;
+  analysisStats?: AnalysisStats | null;
+  similarityThreshold?: number;
+  confidenceThreshold?: number;
 }
 
 function stars(similarity: number): string {
@@ -35,6 +40,9 @@ export function EdgeReviewPanel({
   onReject,
   onEdit,
   isLoading,
+  analysisStats,
+  similarityThreshold = 0.65,
+  confidenceThreshold = 0.5,
 }: EdgeReviewPanelProps) {
   const nodeMap = new Map(allNodes.map((n) => [n.id, n]));
 
@@ -47,9 +55,38 @@ export function EdgeReviewPanel({
   }
 
   if (candidates.length === 0) {
+    const noAnalysisYet = analysisStats === null;
+    const noPairs = analysisStats && analysisStats.pairsAboveThreshold === 0;
+    const noRelations = analysisStats && analysisStats.pairsAboveThreshold > 0 && analysisStats.relationsFound === 0;
+
+    let message: React.ReactNode = "会議横断の関係候補はありません。閾値を下げるか、ナレッジを増やして再分析してください。";
+    if (!noAnalysisYet) {
+      if (noPairs) {
+        message = (
+          <span>
+            類似度閾値（現在 <strong>{similarityThreshold}</strong>）以上の会議横断ペアが 0 件でした。
+            異なる会議（source）のナレッジが複数あるか確認し、<strong>類似度閾値を下げて</strong>（例: 0.55）再分析してください。
+          </span>
+        );
+      } else if (noRelations) {
+        message = (
+          <span>
+            会議横断ペアは <strong>{analysisStats.pairsAboveThreshold} 件</strong>あり、そのうち <strong>{analysisStats.pairsSentToLLM} 件</strong>をLLMで判定しましたが、
+            関係ありと判定された候補は 0 件でした。<strong>確信度閾値</strong>（現在 {confidenceThreshold}）を下げるか、
+            <strong>最大ペア数</strong>を増やして再分析してください。
+          </span>
+        );
+      }
+    }
+
     return (
       <div className="rounded-xl border border-slate-600 bg-slate-800/60 p-6 text-center text-slate-400">
-        会議横断の関係候補はありません。閾値を下げるか、ナレッジを増やして再分析してください。
+        <p className="mb-2">{message}</p>
+        {analysisStats && (
+          <p className="text-xs text-slate-500 mt-2">
+            今回の結果: 類似度候補 {analysisStats.pairsAboveThreshold} 件 → LLM判定 {analysisStats.pairsSentToLLM} 件 → 関係あり {analysisStats.relationsFound} 件
+          </p>
+        )}
       </div>
     );
   }
