@@ -5,8 +5,10 @@ import { parseKnowledgeTable, parseRelationsTable } from "@/lib/table-parser";
 import type { Knowledge, Relation } from "@/lib/types";
 import { VIEWPOINT_COLORS, RELATION_COLORS, DEFAULT_VIEWPOINT_COLOR } from "@/lib/colors";
 
+export type ImportResult = { ok: true } | { ok: false; error: string };
+
 interface ImportPanelProps {
-  onImport: (nodes: Knowledge[], edges: Relation[]) => void;
+  onImport: (nodes: Knowledge[], edges: Relation[]) => void | Promise<ImportResult>;
   importStats: { nodes: number; edges: number } | null;
 }
 
@@ -32,9 +34,11 @@ export function ImportPanel({ onImport, importStats }: ImportPanelProps) {
   const [rawKnowledge, setRawKnowledge] = useState("");
   const [rawRelations, setRawRelations] = useState("");
   const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
+  const [isReflecting, setIsReflecting] = useState(false);
+  const [reflectError, setReflectError] = useState<string | null>(null);
 
   const canReflect =
-    preview.status === "ok" && preview.nodes.length > 0;
+    preview.status === "ok" && preview.nodes.length > 0 && !isReflecting;
 
   const handleParsePreview = () => {
     const knowledgeText = rawKnowledge.trim();
@@ -86,9 +90,18 @@ export function ImportPanel({ onImport, importStats }: ImportPanelProps) {
     }
   };
 
-  const handleReflect = () => {
-    if (preview.status !== "ok" || preview.nodes.length === 0) return;
-    onImport(preview.nodes, preview.edges);
+  const handleReflect = async () => {
+    if (preview.status !== "ok" || preview.nodes.length === 0 || isReflecting) return;
+    setReflectError(null);
+    setIsReflecting(true);
+    try {
+      const result = await Promise.resolve(onImport(preview.nodes, preview.edges));
+      if (result && !result.ok) setReflectError(result.error ?? "反映に失敗しました");
+    } catch (err) {
+      setReflectError(err instanceof Error ? err.message : "反映に失敗しました");
+    } finally {
+      setIsReflecting(false);
+    }
   };
 
   return (
@@ -133,16 +146,22 @@ export function ImportPanel({ onImport, importStats }: ImportPanelProps) {
         >
           解析プレビュー
         </button>
-        {canReflect && (
+        {preview.status === "ok" && preview.nodes.length > 0 && (
           <button
             type="button"
-            onClick={handleReflect}
-            className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500"
+            onClick={() => void handleReflect()}
+            disabled={isReflecting}
+            className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500 disabled:opacity-50"
           >
-            グラフに反映
+            {isReflecting ? "反映中…" : "グラフに反映（全員に共有）"}
           </button>
         )}
       </div>
+      {reflectError && (
+        <div className="rounded-lg border border-rose-500/50 bg-rose-900/20 px-4 py-2 text-sm text-rose-200">
+          {reflectError}
+        </div>
+      )}
 
       {preview.status === "error" && (
         <div className="rounded-lg border border-rose-500/50 bg-rose-900/20 px-4 py-3 text-sm text-rose-200">

@@ -1,7 +1,14 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useGraphDimensions } from "@/lib/use-dimensions";
+import { useSupabaseSync } from "@/lib/use-supabase-sync";
+import {
+  fetchKnowledgeFromSupabase,
+  fetchRelationsFromSupabase,
+  replaceAllKnowledgeAndRelations,
+} from "@/lib/data-supabase";
+import { isSupabaseEnabled } from "@/lib/supabase";
 import { FilterBar } from "@/components/FilterBar";
 import { HubRanking } from "@/components/HubRanking";
 import { DetailPanel } from "@/components/DetailPanel";
@@ -16,8 +23,8 @@ import type { Knowledge, Relation, Filters } from "@/lib/types";
 import knowledgeData from "@/data/knowledge.json";
 import relationsData from "@/data/relations.json";
 
-const initialKnowledge = knowledgeData as Knowledge[];
-const initialRelations = relationsData as Relation[];
+const fallbackKnowledge = knowledgeData as Knowledge[];
+const fallbackRelations = relationsData as Relation[];
 
 const initialFilters: Filters = {
   product: "全て",
@@ -33,13 +40,38 @@ const HEADER_OFFSET = 220;
 type TabId = "graph" | "add" | "import";
 
 export default function Home() {
-  const [knowledge, setKnowledge] = useState<Knowledge[]>(initialKnowledge);
-  const [relations, setRelations] = useState<Relation[]>(initialRelations);
+  const [knowledge, setKnowledge] = useState<Knowledge[]>(fallbackKnowledge);
+  const [relations, setRelations] = useState<Relation[]>(fallbackRelations);
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>("graph");
   const [importStats, setImportStats] = useState<{ nodes: number; edges: number } | null>(null);
   const { width, height } = useGraphDimensions(HEADER_OFFSET);
+
+  // Supabase から初回取得（共有データがあれば上書き）
+  useEffect(() => {
+    if (!isSupabaseEnabled()) return;
+    let cancelled = false;
+    (async () => {
+      const [k, r] = await Promise.all([
+        fetchKnowledgeFromSupabase(),
+        fetchRelationsFromSupabase(),
+      ]);
+      if (!cancelled && k && r) {
+        setKnowledge(k.length > 0 ? k : fallbackKnowledge);
+        setRelations(r);
+        if (k.length > 0) setImportStats({ nodes: k.length, edges: r.length });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // 誰かが取込したら全員に反映（Realtime 購読）
+  useSupabaseSync(useCallback((k: Knowledge[], r: Relation[]) => {
+    setKnowledge(k.length > 0 ? k : fallbackKnowledge);
+    setRelations(r);
+    setImportStats(k.length > 0 ? { nodes: k.length, edges: r.length } : null);
+  }, []));
 
   const graphResult = useMemo(
     () => buildFilteredGraph(knowledge, relations, filters),
@@ -55,14 +87,25 @@ export default function Home() {
     setFilters((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const handleImport = useCallback((newNodes: Knowledge[], newEdges: Relation[]) => {
-    setKnowledge(newNodes);
-    setRelations(newEdges);
-    setImportStats({ nodes: newNodes.length, edges: newEdges.length });
-    setFilters(initialFilters);
-    setSelectedId(null);
-    setTab("graph");
-  }, []);
+  const handleImport = useCallback(
+    async (
+      newNodes: Knowledge[],
+      newEdges: Relation[]
+    ): Promise<{ ok: true } | { ok: false; error: string }> => {
+      if (isSupabaseEnabled()) {
+        const result = await replaceAllKnowledgeAndRelations(newNodes, newEdges);
+        if (!result.ok) return { ok: false, error: result.error ?? "反映に失敗しました" };
+      }
+      setKnowledge(newNodes);
+      setRelations(newEdges);
+      setImportStats({ nodes: newNodes.length, edges: newEdges.length });
+      setFilters(initialFilters);
+      setSelectedId(null);
+      setTab("graph");
+      return { ok: true };
+    },
+    []
+  );
 
   const selectedNode = useMemo(
     () => graphResult.nodes.find((n) => n.id === selectedId) ?? null,
