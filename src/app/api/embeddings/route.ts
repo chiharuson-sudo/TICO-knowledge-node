@@ -4,7 +4,7 @@ import type { Knowledge } from "@/lib/types";
 
 const OPENAI_MODEL = "text-embedding-3-small";
 const OPENAI_BATCH_SIZE = 100;
-const GEMINI_EMBED_MODEL = "text-embedding-004";
+const GEMINI_EMBED_MODEL = "gemini-embedding-001";
 const GEMINI_CONCURRENCY = 5;
 
 export async function POST(req: Request) {
