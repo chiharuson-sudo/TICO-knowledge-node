@@ -2,6 +2,8 @@
 export interface Knowledge {
   id: string;
   title: string;
+  /** データ取込時の元キー。関係テーブルとのマッチング用 */
+  titleKey?: string;
   viewpoint: string;
   content: string;
   product: string;

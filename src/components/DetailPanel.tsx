@@ -2,9 +2,11 @@
 
 import type { NodeWithDegree, FilteredEdge, Relation } from "@/lib/types";
 import { VIEWPOINT_COLORS, RELATION_COLORS, DEFAULT_VIEWPOINT_COLOR } from "@/lib/colors";
+import { edgeToSentence } from "@/lib/edge-verbalizer";
 
 interface DetailPanelProps {
   node: NodeWithDegree | null;
+  nodes: NodeWithDegree[];
   edges: FilteredEdge[];
   onSelectNode: (id: string) => void;
 }
@@ -73,8 +75,34 @@ function RelatedList({
   );
 }
 
+function EdgeVerbalizerBlock({
+  node,
+  nodes,
+  edges,
+}: {
+  node: NodeWithDegree;
+  nodes: NodeWithDegree[];
+  edges: FilteredEdge[];
+}) {
+  const related = edges.filter((e) => e.from === node.id || e.to === node.id);
+  const getTitle = (id: string) => nodes.find((n) => n.id === id)?.title ?? id;
+  if (related.length === 0) {
+    return <p className="text-xs text-slate-500">接続されているエッジはありません</p>;
+  }
+  return (
+    <ul className="space-y-2 text-xs text-slate-300 leading-relaxed">
+      {related.map((e) => (
+        <li key={`${e.from}-${e.to}-${e.type}`} className="list-disc pl-4">
+          {edgeToSentence(e, getTitle)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function DetailPanel({
   node,
+  nodes,
   edges,
   onSelectNode,
 }: DetailPanelProps) {
@@ -146,6 +174,16 @@ export function DetailPanel({
             node={node}
             edges={edges}
             onSelectNode={onSelectNode}
+          />
+        </div>
+        <div>
+          <h4 className="mb-2 text-xs font-medium text-slate-400">
+            つなぎ方（言語化）
+          </h4>
+          <EdgeVerbalizerBlock
+            node={node}
+            nodes={nodes}
+            edges={edges}
           />
         </div>
       </div>

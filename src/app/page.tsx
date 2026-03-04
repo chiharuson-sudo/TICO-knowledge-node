@@ -7,7 +7,9 @@ import { HubRanking } from "@/components/HubRanking";
 import { DetailPanel } from "@/components/DetailPanel";
 import { KnowledgeGraph } from "@/components/KnowledgeGraph";
 import { StatsBar } from "@/components/StatsBar";
+import { EdgeVerbalizerList } from "@/components/EdgeVerbalizerList";
 import { AddKnowledgeForm } from "@/components/AddKnowledgeForm";
+import { ImportPanel } from "@/components/ImportPanel";
 import { buildFilteredGraph } from "@/lib/graph-engine";
 import type { Knowledge, Relation, Filters } from "@/lib/types";
 
@@ -28,14 +30,15 @@ const initialFilters: Filters = {
 
 const HEADER_OFFSET = 220;
 
-type TabId = "graph" | "add";
+type TabId = "graph" | "add" | "import";
 
 export default function Home() {
   const [knowledge, setKnowledge] = useState<Knowledge[]>(initialKnowledge);
-  const [relations] = useState<Relation[]>(initialRelations);
+  const [relations, setRelations] = useState<Relation[]>(initialRelations);
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>("graph");
+  const [importStats, setImportStats] = useState<{ nodes: number; edges: number } | null>(null);
   const { width, height } = useGraphDimensions(HEADER_OFFSET);
 
   const graphResult = useMemo(
@@ -52,6 +55,15 @@ export default function Home() {
     setFilters((prev) => ({ ...prev, [key]: value }));
   }, []);
 
+  const handleImport = useCallback((newNodes: Knowledge[], newEdges: Relation[]) => {
+    setKnowledge(newNodes);
+    setRelations(newEdges);
+    setImportStats({ nodes: newNodes.length, edges: newEdges.length });
+    setFilters(initialFilters);
+    setSelectedId(null);
+    setTab("graph");
+  }, []);
+
   const selectedNode = useMemo(
     () => graphResult.nodes.find((n) => n.id === selectedId) ?? null,
     [graphResult.nodes, selectedId]
@@ -60,33 +72,51 @@ export default function Home() {
   return (
     <div className="flex h-screen min-h-screen flex-col bg-[#0a0e1a] text-slate-200">
       <header className="shrink-0 border-b border-slate-700/80 px-4 py-3">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-lg font-semibold text-slate-100">
             ナレッジグラフ — ノード重視可視化
           </h1>
-          <div className="flex rounded-lg bg-slate-800/80 p-0.5">
-            <button
-              type="button"
-              onClick={() => setTab("graph")}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                tab === "graph"
-                  ? "bg-cyan-600 text-white"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              グラフ
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("add")}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                tab === "add"
-                  ? "bg-cyan-600 text-white"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              ナレッジを追加
-            </button>
+          <div className="flex items-center gap-3">
+            {importStats && (
+              <span className="text-xs text-slate-500">
+                取込: {importStats.nodes}ノード / {importStats.edges}関係
+              </span>
+            )}
+            <div className="flex rounded-lg bg-slate-800/80 p-0.5">
+              <button
+                type="button"
+                onClick={() => setTab("graph")}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  tab === "graph"
+                    ? "bg-cyan-600 text-white"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                グラフ
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("add")}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  tab === "add"
+                    ? "bg-cyan-600 text-white"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                ナレッジを追加
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("import")}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  tab === "import"
+                    ? "bg-cyan-600 text-white"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                📋 データ取込
+              </button>
+            </div>
           </div>
         </div>
         {tab === "graph" && (
@@ -110,6 +140,12 @@ export default function Home() {
                 maxDegree={graphResult.maxDegree}
               />
             </div>
+            <div className="mt-2">
+              <EdgeVerbalizerList
+                nodes={graphResult.nodes}
+                edges={graphResult.edges}
+              />
+            </div>
           </>
         )}
       </header>
@@ -130,10 +166,15 @@ export default function Home() {
           </main>
           <DetailPanel
             node={selectedNode}
+            nodes={graphResult.nodes}
             edges={graphResult.edges}
             onSelectNode={setSelectedId}
           />
         </div>
+      ) : tab === "import" ? (
+        <main className="flex-1 overflow-y-auto">
+          <ImportPanel onImport={handleImport} importStats={importStats} />
+        </main>
       ) : (
         <main className="flex-1 overflow-y-auto py-6">
           <AddKnowledgeForm knowledge={knowledge} onSubmit={handleAddKnowledge} />
