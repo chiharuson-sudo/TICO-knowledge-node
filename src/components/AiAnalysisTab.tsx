@@ -32,8 +32,9 @@ export function AiAnalysisTab({
   onApprove,
   onReject,
 }: AiAnalysisTabProps) {
-  const [openaiKey, setOpenaiKey] = useState("");
+  const [embeddingProvider, setEmbeddingProvider] = useState<"openai" | "gemini">("openai");
   const [llmProvider, setLlmProvider] = useState<"anthropic" | "gemini">("anthropic");
+  const [openaiKey, setOpenaiKey] = useState("");
   const [anthropicKey, setAnthropicKey] = useState("");
   const [geminiKey, setGeminiKey] = useState("");
   const [similarityThreshold, setSimilarityThreshold] = useState(
@@ -53,16 +54,20 @@ export function AiAnalysisTab({
     const ok = openaiKey.trim();
     const ak = anthropicKey.trim();
     const gk = geminiKey.trim();
-    if (!ok) {
-      setError("OpenAI API Key を入力してください");
+    if (embeddingProvider === "openai" && !ok) {
+      setError("Embedding に OpenAI を選択した場合は OpenAI API Key を入力してください");
+      return;
+    }
+    if (embeddingProvider === "gemini" && !gk) {
+      setError("Embedding に Gemini を選択した場合は Gemini API Key を入力してください");
       return;
     }
     if (llmProvider === "anthropic" && !ak) {
-      setError("Anthropic API Key を入力してください");
+      setError("関係分類に Anthropic を選択した場合は Anthropic API Key を入力してください");
       return;
     }
     if (llmProvider === "gemini" && !gk) {
-      setError("Gemini API Key を入力してください");
+      setError("関係分類に Gemini を選択した場合は Gemini API Key を入力してください");
       return;
     }
     setError(null);
@@ -71,7 +76,12 @@ export function AiAnalysisTab({
       const embRes = await fetch("/api/embeddings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nodes: knowledge, openaiApiKey: ok }),
+        body: JSON.stringify({
+          nodes: knowledge,
+          embeddingProvider,
+          openaiApiKey: ok,
+          geminiApiKey: gk,
+        }),
       });
       if (!embRes.ok) {
         const err = await embRes.json().catch(() => ({}));
@@ -139,6 +149,7 @@ export function AiAnalysisTab({
   }, [
     knowledge,
     relations,
+    embeddingProvider,
     openaiKey,
     llmProvider,
     anthropicKey,
@@ -155,20 +166,59 @@ export function AiAnalysisTab({
       <h2 className="text-lg font-semibold text-slate-100">AI分析 — 会議横断エッジ候補</h2>
 
       <div className="rounded-xl border border-slate-600 bg-slate-800/60 p-4 space-y-4">
-        <h3 className="text-sm font-medium text-slate-300">設定（MVP: セッション内のみ保持）</h3>
+        <h3 className="text-sm font-medium text-slate-300">APIキー設定（MVP: セッション内のみ保持・いずれか選択でOK）</h3>
         <div className="grid gap-3 text-sm">
-          <label className="flex flex-col gap-1">
-            <span className="text-slate-400">OpenAI API Key</span>
-            <input
-              type="password"
-              value={openaiKey}
-              onChange={(e) => setOpenaiKey(e.target.value)}
-              placeholder="sk-..."
-              className="rounded border border-slate-600 bg-slate-900 px-3 py-2 text-slate-200"
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-slate-400">関係分類に使う LLM</span>
+          <div className="flex flex-col gap-1">
+            <span className="text-slate-400">Embedding（類似度計算用）</span>
+            <div className="flex gap-4 pt-1">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="embeddingProvider"
+                  checked={embeddingProvider === "openai"}
+                  onChange={() => setEmbeddingProvider("openai")}
+                  className="rounded border-slate-500 text-cyan-500"
+                />
+                <span className="text-slate-300">OpenAI</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="embeddingProvider"
+                  checked={embeddingProvider === "gemini"}
+                  onChange={() => setEmbeddingProvider("gemini")}
+                  className="rounded border-slate-500 text-cyan-500"
+                />
+                <span className="text-slate-300">Gemini</span>
+              </label>
+            </div>
+            {embeddingProvider === "openai" && (
+              <label className="flex flex-col gap-1 pt-1">
+                <span className="text-slate-500 text-xs">OpenAI API Key</span>
+                <input
+                  type="password"
+                  value={openaiKey}
+                  onChange={(e) => setOpenaiKey(e.target.value)}
+                  placeholder="sk-..."
+                  className="rounded border border-slate-600 bg-slate-900 px-3 py-2 text-slate-200"
+                />
+              </label>
+            )}
+            {embeddingProvider === "gemini" && (
+              <label className="flex flex-col gap-1 pt-1">
+                <span className="text-slate-500 text-xs">Gemini API Key（Embedding用）</span>
+                <input
+                  type="password"
+                  value={geminiKey}
+                  onChange={(e) => setGeminiKey(e.target.value)}
+                  placeholder="AIza..."
+                  className="rounded border border-slate-600 bg-slate-900 px-3 py-2 text-slate-200"
+                />
+              </label>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-slate-400">関係分類（LLM）</span>
             <div className="flex gap-4 pt-1">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -188,34 +238,34 @@ export function AiAnalysisTab({
                   onChange={() => setLlmProvider("gemini")}
                   className="rounded border-slate-500 text-cyan-500"
                 />
-                <span className="text-slate-300">Gemini API</span>
+                <span className="text-slate-300">Gemini</span>
               </label>
             </div>
-          </label>
-          {llmProvider === "anthropic" && (
-            <label className="flex flex-col gap-1">
-              <span className="text-slate-400">Anthropic API Key</span>
-              <input
-                type="password"
-                value={anthropicKey}
-                onChange={(e) => setAnthropicKey(e.target.value)}
-                placeholder="sk-ant-..."
-                className="rounded border border-slate-600 bg-slate-900 px-3 py-2 text-slate-200"
-              />
-            </label>
-          )}
-          {llmProvider === "gemini" && (
-            <label className="flex flex-col gap-1">
-              <span className="text-slate-400">Gemini API Key</span>
-              <input
-                type="password"
-                value={geminiKey}
-                onChange={(e) => setGeminiKey(e.target.value)}
-                placeholder="AIza..."
-                className="rounded border border-slate-600 bg-slate-900 px-3 py-2 text-slate-200"
-              />
-            </label>
-          )}
+            {llmProvider === "anthropic" && (
+              <label className="flex flex-col gap-1 pt-1">
+                <span className="text-slate-500 text-xs">Anthropic API Key</span>
+                <input
+                  type="password"
+                  value={anthropicKey}
+                  onChange={(e) => setAnthropicKey(e.target.value)}
+                  placeholder="sk-ant-..."
+                  className="rounded border border-slate-600 bg-slate-900 px-3 py-2 text-slate-200"
+                />
+              </label>
+            )}
+            {llmProvider === "gemini" && (
+              <label className="flex flex-col gap-1 pt-1">
+                <span className="text-slate-500 text-xs">Gemini API Key（関係分類用）</span>
+                <input
+                  type="password"
+                  value={geminiKey}
+                  onChange={(e) => setGeminiKey(e.target.value)}
+                  placeholder="AIza..."
+                  className="rounded border border-slate-600 bg-slate-900 px-3 py-2 text-slate-200"
+                />
+              </label>
+            )}
+          </div>
           <div className="flex flex-wrap gap-4">
             <label className="flex items-center gap-2">
               <span className="text-slate-400">類似度閾値</span>
