@@ -33,7 +33,9 @@ export function AiAnalysisTab({
   onReject,
 }: AiAnalysisTabProps) {
   const [openaiKey, setOpenaiKey] = useState("");
+  const [llmProvider, setLlmProvider] = useState<"anthropic" | "gemini">("anthropic");
   const [anthropicKey, setAnthropicKey] = useState("");
+  const [geminiKey, setGeminiKey] = useState("");
   const [similarityThreshold, setSimilarityThreshold] = useState(
     DEFAULT_SETTINGS.similarityThreshold
   );
@@ -50,12 +52,17 @@ export function AiAnalysisTab({
     }
     const ok = openaiKey.trim();
     const ak = anthropicKey.trim();
+    const gk = geminiKey.trim();
     if (!ok) {
       setError("OpenAI API Key を入力してください");
       return;
     }
-    if (!ak) {
+    if (llmProvider === "anthropic" && !ak) {
       setError("Anthropic API Key を入力してください");
+      return;
+    }
+    if (llmProvider === "gemini" && !gk) {
+      setError("Gemini API Key を入力してください");
       return;
     }
     setError(null);
@@ -101,7 +108,9 @@ export function AiAnalysisTab({
           body: JSON.stringify({
             nodeA,
             nodeB,
+            llmProvider,
             anthropicApiKey: ak,
+            geminiApiKey: gk,
           }),
         });
         if (!classRes.ok) {
@@ -131,7 +140,9 @@ export function AiAnalysisTab({
     knowledge,
     relations,
     openaiKey,
+    llmProvider,
     anthropicKey,
+    geminiKey,
     similarityThreshold,
     confidenceThreshold,
     maxCandidates,
@@ -157,15 +168,54 @@ export function AiAnalysisTab({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-slate-400">Anthropic API Key</span>
-            <input
-              type="password"
-              value={anthropicKey}
-              onChange={(e) => setAnthropicKey(e.target.value)}
-              placeholder="sk-ant-..."
-              className="rounded border border-slate-600 bg-slate-900 px-3 py-2 text-slate-200"
-            />
+            <span className="text-slate-400">関係分類に使う LLM</span>
+            <div className="flex gap-4 pt-1">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="llmProvider"
+                  checked={llmProvider === "anthropic"}
+                  onChange={() => setLlmProvider("anthropic")}
+                  className="rounded border-slate-500 text-cyan-500"
+                />
+                <span className="text-slate-300">Anthropic (Claude)</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="llmProvider"
+                  checked={llmProvider === "gemini"}
+                  onChange={() => setLlmProvider("gemini")}
+                  className="rounded border-slate-500 text-cyan-500"
+                />
+                <span className="text-slate-300">Gemini API</span>
+              </label>
+            </div>
           </label>
+          {llmProvider === "anthropic" && (
+            <label className="flex flex-col gap-1">
+              <span className="text-slate-400">Anthropic API Key</span>
+              <input
+                type="password"
+                value={anthropicKey}
+                onChange={(e) => setAnthropicKey(e.target.value)}
+                placeholder="sk-ant-..."
+                className="rounded border border-slate-600 bg-slate-900 px-3 py-2 text-slate-200"
+              />
+            </label>
+          )}
+          {llmProvider === "gemini" && (
+            <label className="flex flex-col gap-1">
+              <span className="text-slate-400">Gemini API Key</span>
+              <input
+                type="password"
+                value={geminiKey}
+                onChange={(e) => setGeminiKey(e.target.value)}
+                placeholder="AIza..."
+                className="rounded border border-slate-600 bg-slate-900 px-3 py-2 text-slate-200"
+              />
+            </label>
+          )}
           <div className="flex flex-wrap gap-4">
             <label className="flex items-center gap-2">
               <span className="text-slate-400">類似度閾値</span>
