@@ -10,16 +10,27 @@
    - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
    - **anon public** キー → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-## 2. 環境変数
+## 2. 環境変数（手順3: .env.local の設定）
 
-プロジェクトルートに `.env.local` を作成:
+**プロジェクトのルートフォルダ**（`package.json` がある場所）に `.env.local` を作成します。
+
+1. ルートに `.env.local` という名前のファイルを新規作成する。
+2. 次の2行を書き、Supabase の **Settings** → **API** で控えた値に置き換える。
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9....
 ```
 
-Vercel にデプロイする場合は、Vercel の **Settings** → **Environment Variables** で同じ変数を追加してください。
+- **NEXT_PUBLIC_SUPABASE_URL** … Project URL（`https://〇〇〇.supabase.co`）
+- **NEXT_PUBLIC_SUPABASE_ANON_KEY** … anon public キー（長い文字列）
+- 変数名を **NEXT_PUBLIC_** のままにすること（ typo に注意。`NEXtoT_PUBLIC_` などは不可）。
+
+3. 保存したら、開発サーバーを一度止めて `npm run dev` で再起動する。
+
+**別のやり方**: リポジトリにある `.env.local.example` をコピーして `.env.local` にリネームし、中身の値を自分のプロジェクトのものに書き換えてもよい。
+
+**Vercel で公開する場合**: Vercel の **Settings** → **Environment Variables** に、上記2つと同じ名前・値を追加する。
 
 ## 3. テーブル作成
 
