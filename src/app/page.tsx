@@ -17,8 +17,10 @@ import { StatsBar } from "@/components/StatsBar";
 import { EdgeVerbalizerList } from "@/components/EdgeVerbalizerList";
 import { AddKnowledgeForm } from "@/components/AddKnowledgeForm";
 import { ImportPanel } from "@/components/ImportPanel";
+import { AiAnalysisTab } from "@/components/AiAnalysisTab";
 import { buildFilteredGraph } from "@/lib/graph-engine";
-import type { Knowledge, Relation, Filters } from "@/lib/types";
+import type { Knowledge, Relation, Filters, RelationType } from "@/lib/types";
+import type { EdgeCandidate } from "@/components/EdgeReviewPanel";
 
 import knowledgeData from "@/data/knowledge.json";
 import relationsData from "@/data/relations.json";
@@ -37,7 +39,7 @@ const initialFilters: Filters = {
 
 const HEADER_OFFSET = 220;
 
-type TabId = "graph" | "add" | "import";
+type TabId = "graph" | "add" | "import" | "ai";
 
 export default function Home() {
   const [knowledge, setKnowledge] = useState<Knowledge[]>(fallbackKnowledge);
@@ -46,6 +48,8 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>("graph");
   const [importStats, setImportStats] = useState<{ nodes: number; edges: number } | null>(null);
+  const [edgeCandidates, setEdgeCandidates] = useState<EdgeCandidate[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { width, height } = useGraphDimensions(HEADER_OFFSET);
 
   // Supabase から初回取得（共有データがあれば上書き）
@@ -87,6 +91,30 @@ export default function Home() {
     setFilters((prev) => ({ ...prev, [key]: value }));
   }, []);
 
+  const handleApproveEdge = useCallback(
+    (fromId: string, toId: string, type: string, desc: string) => {
+      const relType = (["前提", "因果", "対策", "波及"].includes(type) ? type : "前提") as RelationType;
+      const newRelation: Relation = { from: fromId, to: toId, type: relType, description: desc };
+      const newRelations = [...relations, newRelation];
+      setRelations(newRelations);
+      setEdgeCandidates((prev) =>
+        prev.filter((c) => !(c.fromId === fromId && c.toId === toId) && !(c.fromId === toId && c.toId === fromId))
+      );
+      if (isSupabaseEnabled()) {
+        replaceAllKnowledgeAndRelations(knowledge, newRelations).then((r) => {
+          if (!r.ok) console.error("Supabase 反映失敗:", r.error);
+        });
+      }
+    },
+    [knowledge, relations]
+  );
+
+  const handleRejectEdge = useCallback((fromId: string, toId: string) => {
+    setEdgeCandidates((prev) =>
+      prev.filter((c) => !(c.fromId === fromId && c.toId === toId) && !(c.fromId === toId && c.toId === fromId))
+    );
+  }, []);
+
   const handleImport = useCallback(
     async (
       newNodes: Knowledge[],
@@ -120,6 +148,12 @@ export default function Home() {
             ナレッジグラフ — ノード重視可視化
           </h1>
           <div className="flex items-center gap-3">
+            <span
+              className={`text-xs ${isSupabaseEnabled() ? "text-emerald-400" : "text-slate-500"}`}
+              title={isSupabaseEnabled() ? "Supabase 接続済み。取込は全員に反映されます。" : "Supabase 未設定。取込はこの端末のみです。"}
+            >
+              {isSupabaseEnabled() ? "共有: オン" : "共有: オフ"}
+            </span>
             {importStats && (
               <span className="text-xs text-slate-500">
                 取込: {importStats.nodes}ノード / {importStats.edges}関係
@@ -158,6 +192,17 @@ export default function Home() {
                 }`}
               >
                 📋 データ取込
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("ai")}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  tab === "ai"
+                    ? "bg-cyan-600 text-white"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                🤖 AI分析
               </button>
             </div>
           </div>
@@ -217,6 +262,19 @@ export default function Home() {
       ) : tab === "import" ? (
         <main className="flex-1 overflow-y-auto">
           <ImportPanel onImport={handleImport} importStats={importStats} />
+        </main>
+      ) : tab === "ai" ? (
+        <main className="flex-1 overflow-y-auto">
+          <AiAnalysisTab
+            knowledge={knowledge}
+            relations={relations}
+            candidates={edgeCandidates}
+            setCandidates={setEdgeCandidates}
+            isAnalyzing={isAnalyzing}
+            setAnalyzing={setIsAnalyzing}
+            onApprove={handleApproveEdge}
+            onReject={handleRejectEdge}
+          />
         </main>
       ) : (
         <main className="flex-1 overflow-y-auto py-6">
