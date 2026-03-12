@@ -103,7 +103,7 @@ export function KnowledgeVerificationView({
         if (!s) return null;
         return { start: s.start, end: s.end, active: isHovered(k.id) };
       })
-      .filter((s): s is { start: number; end: number; active?: boolean } => s !== null);
+      .filter((s): s is { start: number; end: number; active: boolean } => s !== null);
     return applyHighlights(vttText, spans);
   }, [vttText, filtered, currentSource, hoveredId]);
 

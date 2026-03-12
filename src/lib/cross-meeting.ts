@@ -49,7 +49,7 @@ export function findCrossMeetingPairs(
           similarity: sim,
           fromSource: aSource || "不明",
           toSource: bSource || "不明",
-          isCrossMeeting: bothHaveSource && aSource !== bSource,
+          isCrossMeeting: Boolean(bothHaveSource && aSource !== bSource),
         });
       }
     }
