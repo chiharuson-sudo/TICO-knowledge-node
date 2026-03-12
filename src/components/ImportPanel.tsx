@@ -64,7 +64,14 @@ export function ImportPanel({ onImport, importStats }: ImportPanelProps) {
         const result = parseRelationsTable(rawRelations.trim(), nodes);
         edges = result.edges;
         relationLog = { totalRows: result.totalRows, matchedRows: result.matchedRows };
+        result.sourceMap.forEach((source, nodeId) => {
+          const node = nodes.find((n) => n.id === nodeId);
+          if (node) node.source = source;
+        });
       }
+      nodes.forEach((node) => {
+        if (!node.source) node.source = "不明";
+      });
 
       const productCount = new Set(nodes.map((n) => n.product)).size;
       const domainCount = new Set(nodes.map((n) => n.domain).filter(Boolean)).size;
@@ -183,6 +190,11 @@ export function ImportPanel({ onImport, importStats }: ImportPanelProps) {
                   ⚠ {preview.relationLog.totalRows - preview.relationLog.matchedRows} 件のマッチ失敗（From/Toがナレッジに見つからない）
                 </span>
               )}
+              {preview.nodes.some((n) => n.source && n.source !== "不明") && (
+                <span className="text-cyan-400">
+                  ✓ 会議（source）付与: {preview.nodes.filter((n) => n.source && n.source !== "不明").length} 件
+                </span>
+              )}
             </div>
           )}
 
@@ -225,6 +237,9 @@ export function ImportPanel({ onImport, importStats }: ImportPanelProps) {
                   </span>
                   <span className="truncate text-slate-300">{n.title}</span>
                   <span className="text-slate-500">{n.product}</span>
+                  {n.source && n.source !== "不明" && (
+                    <span className="rounded bg-cyan-900/40 px-1.5 py-0.5 text-xs text-cyan-300">{n.source}</span>
+                  )}
                 </li>
               ))}
             </ul>

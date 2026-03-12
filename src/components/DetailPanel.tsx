@@ -1,14 +1,19 @@
 "use client";
 
 import type { NodeWithDegree, FilteredEdge, Relation } from "@/lib/types";
+import type { RelationType } from "@/lib/types";
 import { VIEWPOINT_COLORS, RELATION_COLORS, DEFAULT_VIEWPOINT_COLOR } from "@/lib/colors";
 import { edgeToSentence } from "@/lib/edge-verbalizer";
+import { RelationCard, type RelationWithNodes } from "./RelationCard";
 
 interface DetailPanelProps {
   node: NodeWithDegree | null;
   nodes: NodeWithDegree[];
   edges: FilteredEdge[];
   onSelectNode: (id: string) => void;
+  onRelationApprove?: (from: string, to: string) => void;
+  onRelationReject?: (from: string, to: string) => void;
+  onRelationChangeType?: (from: string, to: string, newType: RelationType) => void;
 }
 
 function RelatedList({
@@ -100,11 +105,61 @@ function EdgeVerbalizerBlock({
   );
 }
 
+function RelationFeedbackBlock({
+  node,
+  nodes,
+  edges,
+  onSelectNode,
+  onApprove,
+  onReject,
+  onChangeType,
+}: {
+  node: NodeWithDegree;
+  nodes: NodeWithDegree[];
+  edges: FilteredEdge[];
+  onSelectNode: (id: string) => void;
+  onApprove?: (from: string, to: string) => void;
+  onReject?: (from: string, to: string) => void;
+  onChangeType?: (from: string, to: string, newType: RelationType) => void;
+}) {
+  const related = edges.filter((e) => e.from === node.id || e.to === node.id);
+  const getTitle = (id: string) => nodes.find((n) => n.id === id)?.title ?? id;
+  if (related.length === 0) return null;
+  const withNodes: RelationWithNodes[] = related.map((e) => ({
+    ...e,
+    fromTitle: getTitle(e.from),
+    toTitle: getTitle(e.to),
+  }));
+  return (
+    <div className="space-y-2">
+      <h4 className="text-xs font-medium text-slate-400">
+        同一会議内の関係性 — FB（FMEAのS値根拠を確定）
+      </h4>
+      <p className="text-xs text-slate-500" title="関係性を定義することで、FMEAの影響度の根拠が確定します">
+        OK/NG/変更でフィードバックしてください
+      </p>
+      {withNodes.map((edge) => (
+        <RelationCard
+          key={`${edge.from}-${edge.to}`}
+          edge={edge}
+          compact={false}
+          onApprove={onApprove}
+          onReject={onReject}
+          onChangeType={onChangeType}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function DetailPanel({
   node,
   nodes,
   edges,
   onSelectNode,
+  onRelationApprove,
+  onRelationReject,
+  onRelationChangeType,
 }: DetailPanelProps) {
   if (!node) {
     return (
@@ -176,6 +231,15 @@ export function DetailPanel({
             onSelectNode={onSelectNode}
           />
         </div>
+        <RelationFeedbackBlock
+          node={node}
+          nodes={nodes}
+          edges={edges}
+          onSelectNode={onSelectNode}
+          onApprove={onRelationApprove}
+          onReject={onRelationReject}
+          onChangeType={onRelationChangeType}
+        />
         <div>
           <h4 className="mb-2 text-xs font-medium text-slate-400">
             つなぎ方（言語化）

@@ -24,7 +24,7 @@ interface AiAnalysisTabProps {
   setCandidates: (c: EdgeCandidate[]) => void;
   isAnalyzing: boolean;
   setAnalyzing: (v: boolean) => void;
-  onApprove: (fromId: string, toId: string, type: string, desc: string) => void;
+  onApprove: (fromId: string, toId: string, type: string, desc: string, confidence?: number) => void;
   onReject: (fromId: string, toId: string) => void;
 }
 
@@ -116,10 +116,15 @@ export function AiAnalysisTab({
 
       const nodeMap = new Map(knowledge.map((n) => [n.id, n]));
       const classified: EdgeCandidate[] = [];
-      for (const p of topPairs) {
+      const GEMINI_DELAY_MS = 13_000;
+      for (let i = 0; i < topPairs.length; i++) {
+        const p = topPairs[i];
         const nodeA = nodeMap.get(p.fromId);
         const nodeB = nodeMap.get(p.toId);
         if (!nodeA || !nodeB) continue;
+        if (llmProvider === "gemini" && i > 0) {
+          await new Promise((r) => setTimeout(r, GEMINI_DELAY_MS));
+        }
         const classRes = await fetch("/api/classify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -143,6 +148,7 @@ export function AiAnalysisTab({
             similarity: p.similarity,
             fromSource: p.fromSource ?? "",
             toSource: p.toSource ?? "",
+            isCrossMeeting: p.isCrossMeeting,
             classification,
           });
         }
@@ -175,9 +181,47 @@ export function AiAnalysisTab({
     setAnalyzing,
   ]);
 
+  const noSourceCount = knowledge.filter((n) => !n.source || n.source === "不明").length;
+  const sourceGroups = [...new Set(knowledge.map((n) => n.source).filter((s) => s && s !== "不明"))];
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
       <h2 className="text-lg font-semibold text-slate-100">AI分析 — 会議横断エッジ候補</h2>
+
+      {knowledge.length > 0 && (
+        <div className="rounded-xl border border-slate-600 bg-slate-800/60 p-4 space-y-2">
+          <h3 className="text-sm font-medium text-slate-300">会議ソース分布</h3>
+          <p className="text-xs text-slate-400">
+            ソース特定済み: <strong className="text-slate-200">{knowledge.length - noSourceCount} 件</strong>
+            {sourceGroups.length > 0 && (
+              <>（<strong className="text-cyan-400">{sourceGroups.length} 会議</strong>）</>
+            )}
+            {noSourceCount > 0 && (
+              <> ｜ ソース不明: <strong className="text-amber-400">{noSourceCount} 件</strong></>
+            )}
+          </p>
+          {sourceGroups.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {sourceGroups.map((source) => {
+                const count = knowledge.filter((n) => n.source === source).length;
+                return (
+                  <span
+                    key={source}
+                    className="rounded bg-slate-700/60 px-2 py-1 text-xs text-slate-300"
+                  >
+                    {source}: {count}件
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          {noSourceCount > knowledge.length * 0.5 && (
+            <div className="rounded border border-amber-500/50 bg-amber-900/20 px-3 py-2 text-sm text-amber-200">
+              ⚠ ナレッジの半数以上にソース（会議名）が設定されていません。会議横断候補を出すには、<strong>データ取込</strong>で<strong>関係テーブルを先にインポート</strong>すると、3列目のソースが自動で付与されます。
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="rounded-xl border border-slate-600 bg-slate-800/60 p-4 space-y-4">
         <h3 className="text-sm font-medium text-slate-300">APIキー設定（MVP: セッション内のみ保持・いずれか選択でOK）</h3>

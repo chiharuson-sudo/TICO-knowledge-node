@@ -11,13 +11,14 @@ export interface EdgeCandidate {
   similarity: number;
   fromSource: string;
   toSource: string;
+  isCrossMeeting?: boolean;
   classification: ClassificationResult;
 }
 
 interface EdgeReviewPanelProps {
   candidates: EdgeCandidate[];
   allNodes: Knowledge[];
-  onApprove: (fromId: string, toId: string, type: string, desc: string) => void;
+  onApprove: (fromId: string, toId: string, type: string, desc: string, confidence?: number) => void;
   onReject: (fromId: string, toId: string) => void;
   onEdit?: (fromId: string, toId: string) => void;
   isLoading: boolean;
@@ -58,14 +59,24 @@ export function EdgeReviewPanel({
     const noAnalysisYet = analysisStats === null;
     const noPairs = analysisStats && analysisStats.pairsAboveThreshold === 0;
     const noRelations = analysisStats && analysisStats.pairsAboveThreshold > 0 && analysisStats.relationsFound === 0;
+    const sourceCount = new Set(allNodes.map((n) => n.source ?? "")).size;
 
     let message: React.ReactNode = "会議横断の関係候補はありません。閾値を下げるか、ナレッジを増やして再分析してください。";
     if (!noAnalysisYet) {
       if (noPairs) {
         message = (
           <span>
-            類似度閾値（現在 <strong>{similarityThreshold}</strong>）以上の会議横断ペアが 0 件でした。
-            異なる会議（source）のナレッジが複数あるか確認し、<strong>類似度閾値を下げて</strong>（例: 0.55）再分析してください。
+            {sourceCount <= 1 ? (
+              <>
+                現在のナレッジは会議（source）が <strong>1 種類だけ</strong>のため、会議横断ペアは 0 件です。
+                会議横断の候補を出すには、<strong>データ取込</strong>で<strong>異なる会議（source）</strong>のナレッジを追加してください。
+              </>
+            ) : (
+              <>
+                類似度閾値（現在 <strong>{similarityThreshold}</strong>）以上の会議横断ペアが 0 件でした。
+                会議は {sourceCount} 種類ありますが、類似度を上げるペアがありません。<strong>類似度閾値を下げて</strong>（例: 0.45）再分析してください。
+              </>
+            )}
           </span>
         );
       } else if (noRelations) {
@@ -85,6 +96,9 @@ export function EdgeReviewPanel({
         {analysisStats && (
           <p className="text-xs text-slate-500 mt-2">
             今回の結果: 類似度候補 {analysisStats.pairsAboveThreshold} 件 → LLM判定 {analysisStats.pairsSentToLLM} 件 → 関係あり {analysisStats.relationsFound} 件
+            {allNodes.length > 0 && (
+              <> ｜ 現在のナレッジ: 会議（source）<strong> {sourceCount} 種類</strong> / ノード {allNodes.length} 件</>
+            )}
           </p>
         )}
       </div>
@@ -114,7 +128,16 @@ export function EdgeReviewPanel({
               key={`${c.fromId}-${c.toId}`}
               className="rounded-lg border border-slate-600 bg-slate-800/50 p-4"
             >
-              <div className="mb-1 flex items-center gap-2">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                {c.isCrossMeeting ? (
+                  <span className="rounded bg-cyan-600/30 px-1.5 py-0.5 text-xs text-cyan-300">
+                    🔗 会議横断
+                  </span>
+                ) : (
+                  <span className="rounded bg-slate-600/30 px-1.5 py-0.5 text-xs text-slate-400">
+                    📌 同一会議内
+                  </span>
+                )}
                 <span className="text-xs text-cyan-400">
                   [類似度 {c.similarity.toFixed(2)}] {stars(c.similarity)}
                 </span>
@@ -136,7 +159,7 @@ export function EdgeReviewPanel({
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => onApprove(fromId, toId, typeLabel, desc)}
+                  onClick={() => onApprove(fromId, toId, typeLabel, desc, cl.confidence)}
                   className="rounded bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-500"
                 >
                   承認

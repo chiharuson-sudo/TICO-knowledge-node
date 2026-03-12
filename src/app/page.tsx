@@ -18,7 +18,10 @@ import { EdgeVerbalizerList } from "@/components/EdgeVerbalizerList";
 import { AddKnowledgeForm } from "@/components/AddKnowledgeForm";
 import { ImportPanel } from "@/components/ImportPanel";
 import { AiAnalysisTab } from "@/components/AiAnalysisTab";
+import { BatchRelationsView } from "@/components/BatchRelationsView";
+import { KnowledgeVerificationView, type KnowledgeReviewStatus } from "@/components/KnowledgeVerificationView";
 import { buildFilteredGraph } from "@/lib/graph-engine";
+import { runAutoApproveDry } from "@/lib/autoApproveTask";
 import type { Knowledge, Relation, Filters, RelationType } from "@/lib/types";
 import type { EdgeCandidate } from "@/components/EdgeReviewPanel";
 
@@ -39,7 +42,7 @@ const initialFilters: Filters = {
 
 const HEADER_OFFSET = 220;
 
-type TabId = "graph" | "add" | "import" | "ai";
+type TabId = "graph" | "add" | "import" | "ai" | "relations" | "knowledge-review";
 
 export default function Home() {
   const [knowledge, setKnowledge] = useState<Knowledge[]>(fallbackKnowledge);
@@ -50,6 +53,8 @@ export default function Home() {
   const [importStats, setImportStats] = useState<{ nodes: number; edges: number } | null>(null);
   const [edgeCandidates, setEdgeCandidates] = useState<EdgeCandidate[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [knowledgeReviewStatusMap, setKnowledgeReviewStatusMap] = useState<Record<string, KnowledgeReviewStatus>>({});
+  const [sourceDocuments, setSourceDocuments] = useState<Record<string, string>>({});
   const { width, height } = useGraphDimensions(HEADER_OFFSET);
 
   // Supabase から初回取得（共有データがあれば上書き）
@@ -77,6 +82,12 @@ export default function Home() {
     setImportStats(k.length > 0 ? { nodes: k.length, edges: r.length } : null);
   }, []));
 
+  // サイレント承認: auto_approve_at を過ぎた関係を自動で silent_approved に更新
+  useEffect(() => {
+    const { updated, changed } = runAutoApproveDry(relations);
+    if (changed) setRelations(updated);
+  }, [relations]);
+
   const graphResult = useMemo(
     () => buildFilteredGraph(knowledge, relations, filters),
     [knowledge, relations, filters]
@@ -92,9 +103,23 @@ export default function Home() {
   }, []);
 
   const handleApproveEdge = useCallback(
-    (fromId: string, toId: string, type: string, desc: string) => {
+    (fromId: string, toId: string, type: string, desc: string, confidence?: number) => {
       const relType = (["前提", "因果", "対策", "波及"].includes(type) ? type : "前提") as RelationType;
-      const newRelation: Relation = { from: fromId, to: toId, type: relType, description: desc };
+      const conf = confidence ?? 0;
+      const autoApproveAt =
+        conf >= 0.9
+          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+          : undefined;
+      const newRelation: Relation = {
+        from: fromId,
+        to: toId,
+        type: relType,
+        description: desc,
+        evidence_text: desc,
+        confidence_score: conf,
+        status: conf >= 0.9 ? "pending" : "approved",
+        auto_approve_at: autoApproveAt,
+      };
       const newRelations = [...relations, newRelation];
       setRelations(newRelations);
       setEdgeCandidates((prev) =>
@@ -114,6 +139,68 @@ export default function Home() {
       prev.filter((c) => !(c.fromId === fromId && c.toId === toId) && !(c.fromId === toId && c.toId === fromId))
     );
   }, []);
+
+  const handleRelationApprove = useCallback(
+    (from: string, to: string) => {
+      const newRelations = relations.map((e) =>
+        e.from === from && e.to === to ? { ...e, status: "approved" as const } : e
+      );
+      setRelations(newRelations);
+      if (isSupabaseEnabled()) {
+        replaceAllKnowledgeAndRelations(knowledge, newRelations).then((r) => {
+          if (!r.ok) console.error("Supabase 反映失敗:", r.error);
+        });
+      }
+    },
+    [knowledge, relations]
+  );
+
+  const handleRelationReject = useCallback(
+    (from: string, to: string) => {
+      const newRelations = relations.filter((e) => !(e.from === from && e.to === to));
+      setRelations(newRelations);
+      if (isSupabaseEnabled()) {
+        replaceAllKnowledgeAndRelations(knowledge, newRelations).then((r) => {
+          if (!r.ok) console.error("Supabase 反映失敗:", r.error);
+        });
+      }
+    },
+    [knowledge, relations]
+  );
+
+  const handleRelationChangeType = useCallback(
+    (from: string, to: string, newType: RelationType) => {
+      const newRelations = relations.map((e) =>
+        e.from === from && e.to === to ? { ...e, type: newType, status: "changed" as const } : e
+      );
+      setRelations(newRelations);
+      if (isSupabaseEnabled()) {
+        replaceAllKnowledgeAndRelations(knowledge, newRelations).then((r) => {
+          if (!r.ok) console.error("Supabase 反映失敗:", r.error);
+        });
+      }
+    },
+    [knowledge, relations]
+  );
+
+  const handleKnowledgeReviewStatusChange = useCallback((id: string, status: KnowledgeReviewStatus) => {
+    setKnowledgeReviewStatusMap((prev) => ({ ...prev, [id]: status }));
+  }, []);
+
+  const handleKnowledgeEdit = useCallback(
+    (id: string, patch: { title?: string; content?: string }) => {
+      const newKnowledge = knowledge.map((k) =>
+        k.id === id ? { ...k, ...patch } : k
+      );
+      setKnowledge(newKnowledge);
+      if (isSupabaseEnabled()) {
+        replaceAllKnowledgeAndRelations(newKnowledge, relations).then((r) => {
+          if (!r.ok) console.error("Supabase 反映失敗:", r.error);
+        });
+      }
+    },
+    [knowledge, relations]
+  );
 
   const handleImport = useCallback(
     async (
@@ -204,6 +291,28 @@ export default function Home() {
               >
                 🤖 AI分析
               </button>
+              <button
+                type="button"
+                onClick={() => setTab("relations")}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  tab === "relations"
+                    ? "bg-cyan-600 text-white"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                関係性FB
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("knowledge-review")}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  tab === "knowledge-review"
+                    ? "bg-cyan-600 text-white"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                ナレッジ確認
+              </button>
             </div>
           </div>
         </div>
@@ -257,6 +366,9 @@ export default function Home() {
             nodes={graphResult.nodes}
             edges={graphResult.edges}
             onSelectNode={setSelectedId}
+            onRelationApprove={handleRelationApprove}
+            onRelationReject={handleRelationReject}
+            onRelationChangeType={handleRelationChangeType}
           />
         </div>
       ) : tab === "import" ? (
@@ -274,6 +386,33 @@ export default function Home() {
             setAnalyzing={setIsAnalyzing}
             onApprove={handleApproveEdge}
             onReject={handleRejectEdge}
+          />
+        </main>
+      ) : tab === "relations" ? (
+        <main className="flex-1 overflow-y-auto">
+          <BatchRelationsView
+            nodes={knowledge}
+            edges={relations}
+            onRelationApprove={handleRelationApprove}
+            onRelationReject={handleRelationReject}
+            onRelationChangeType={handleRelationChangeType}
+          />
+        </main>
+      ) : tab === "knowledge-review" ? (
+        <main className="flex-1 overflow-y-auto">
+          <KnowledgeVerificationView
+            knowledge={knowledge}
+            relations={relations}
+            sourceDocuments={sourceDocuments}
+            onSourceDocumentChange={(source, text) =>
+              setSourceDocuments((prev) => ({ ...prev, [source]: text }))
+            }
+            reviewStatusMap={knowledgeReviewStatusMap}
+            onReviewStatusChange={handleKnowledgeReviewStatusChange}
+            onKnowledgeEdit={handleKnowledgeEdit}
+            onRelationApprove={handleRelationApprove}
+            onRelationReject={handleRelationReject}
+            onRelationChangeType={handleRelationChangeType}
           />
         </main>
       ) : (

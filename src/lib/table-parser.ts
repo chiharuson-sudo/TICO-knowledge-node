@@ -104,6 +104,22 @@ function normalizeRelationType(type: string): RelationType {
 }
 
 /**
+ * 関係テーブル3列目のソース文字列を会議名として正規化
+ * 例: "設計チェックシート読み合わせ会-20251007_110356.vtt_..." → "読み合わせ会-2025/10/07"
+ */
+export function normalizeSource(rawSource: string): string {
+  const raw = rawSource.trim();
+  if (!raw) return "";
+  const dateMatch = raw.match(/(\d{8})/);
+  if (!dateMatch) return raw.slice(0, 30);
+  const date = dateMatch[1];
+  const formatted = `${date.slice(0, 4)}/${date.slice(4, 6)}/${date.slice(6, 8)}`;
+  if (raw.includes("読み合わせ会")) return `読み合わせ会-${formatted}`;
+  if (raw.includes("DR")) return `DR-${formatted}`;
+  return `会議-${formatted}`;
+}
+
+/**
  * "："以降のタイトル部分を抽出し、観点サフィックスを除去
  */
 function extractTitle(key: string): string {
@@ -115,6 +131,7 @@ function extractTitle(key: string): string {
 
 export interface ParseRelationsResult {
   edges: Relation[];
+  sourceMap: Map<string, string>;
   totalRows: number;
   matchedRows: number;
 }
@@ -128,6 +145,7 @@ export function parseRelationsTable(
 ): ParseRelationsResult {
   const lines = raw.split("\n").filter((l) => l.trim().length > 0);
   const edges: Relation[] = [];
+  const sourceMap = new Map<string, string>();
   let totalRows = 0;
   let matchedRows = 0;
 
@@ -167,6 +185,7 @@ export function parseRelationsTable(
 
     totalRows++;
     const desc = (cols[1] ?? "").trim();
+    const rawSource = (cols[2] ?? "").trim();
     const fromKey = (cols[3] ?? "").trim();
     const toKey = (cols[4] ?? "").trim();
     const typeStr = (
@@ -188,7 +207,13 @@ export function parseRelationsTable(
       });
       matchedRows++;
     }
+
+    if (rawSource) {
+      const normalized = normalizeSource(rawSource);
+      if (fromId) sourceMap.set(fromId, normalized);
+      if (toId) sourceMap.set(toId, normalized);
+    }
   }
 
-  return { edges, totalRows, matchedRows };
+  return { edges, sourceMap, totalRows, matchedRows };
 }

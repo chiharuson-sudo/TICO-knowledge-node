@@ -61,7 +61,7 @@ export async function fetchKnowledgeFromSupabase(): Promise<Knowledge[] | null> 
  */
 export async function fetchRelationsFromSupabase(): Promise<Relation[] | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase.from(RELATIONS_TABLE).select("from_id, to_id, type, description");
+  const { data, error } = await supabase.from(RELATIONS_TABLE).select("*");
   if (error) {
     console.error("fetchRelations error:", error);
     return null;
@@ -71,6 +71,10 @@ export async function fetchRelationsFromSupabase(): Promise<Relation[] | null> {
     to: String(row.to_id ?? ""),
     type: String(row.type ?? "前提") as Relation["type"],
     description: String(row.description ?? ""),
+    evidence_text: row.evidence_text != null ? String(row.evidence_text) : undefined,
+    confidence_score: row.confidence_score != null ? Number(row.confidence_score) : undefined,
+    status: row.status != null ? String(row.status) as Relation["status"] : undefined,
+    auto_approve_at: row.auto_approve_at != null ? String(row.auto_approve_at) : undefined,
   }));
 }
 
@@ -111,6 +115,10 @@ export async function replaceAllKnowledgeAndRelations(
         to_id: e.to,
         type: e.type,
         description: e.description ?? "",
+        evidence_text: e.evidence_text ?? null,
+        confidence_score: e.confidence_score ?? null,
+        status: e.status ?? "pending",
+        auto_approve_at: e.auto_approve_at ?? null,
       }));
       const { error: insRel } = await supabase.from(RELATIONS_TABLE).insert(relRows);
       if (insRel) {
